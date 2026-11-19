@@ -1,0 +1,11 @@
+{
+  "name": "md-viewer",
+  "version": "0.1.0",
+  "description": "Local-only browser extension that renders file:// Markdown files.",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "test": "node scripts/test.mjs"
+  }
+}

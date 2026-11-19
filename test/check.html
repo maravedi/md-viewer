@@ -1,0 +1,33 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>RUNNING</title>
+<script src="../extension/vendor/marked.umd.js"></script>
+<script src="../extension/vendor/purify.min.js"></script>
+<script src="../extension/render.js"></script>
+<pre id="out"></pre>
+<script>
+  // Run by scripts/test.mjs in headless Chrome; result lands in <title> and #out.
+  const src = [
+    '# Sample document', '', 'Text **bold** [jump](#second-heading)', '',
+    '## Second heading', '', '| A | B |', '|---|---|', '| 1 | 2 |', '', '- [x] done', '',
+    '<img src="x" onerror="window.__pwned = true">', '<script>window.__pwned = true<\/script>',
+    '[bad](javascript:window.__pwned=true)', '', '## Second heading',
+  ].join('\n');
+  const root = document.createElement('div');
+  root.innerHTML = renderMarkdown(src);
+  addHeadingIds(root);
+  const html = root.innerHTML;
+  const checks = {
+    h1: !!root.querySelector('h1'),
+    bold: !!root.querySelector('strong'),
+    table: !!root.querySelector('table td'),
+    taskList: !!root.querySelector('input[type=checkbox][checked]'),
+    headingIds: !!root.querySelector('#second-heading') && !!root.querySelector('#second-heading-1'),
+    noScript: !root.querySelector('script'),
+    noHandlers: !/onerror/i.test(html),
+    noJsLinks: ![...root.querySelectorAll('[href],[src]')].some(e => /^\s*javascript:/i.test(e.getAttribute('href') || e.getAttribute('src'))),
+  };
+  const failed = Object.keys(checks).filter(k => !checks[k]);
+  document.getElementById('out').textContent = JSON.stringify(checks);
+  setTimeout(() => { document.title = failed.length || window.__pwned ? 'FAIL ' + failed.join(',') + (window.__pwned ? ' pwned' : '') : 'PASS'; }, 50);
+</script>
